@@ -298,12 +298,12 @@ class BinaryOp(TreeNode):
 
     def __repr__(self):
         bop_symbol = {
-                   "add": "+",
-                   "sub": "-",
-                   "mul": "*",
-                   "truediv": "/",
-                   "matmul": "@",
-                   "tensordot": "@"
+            "add": "+",
+            "sub": "-",
+            "mul": "*",
+            "truediv": "/",
+            "matmul": "@",
+            "tensordot": "@"
         }[self.op_name]
         return "(%s %s %s)" % (str(self.left), bop_symbol, str(self.right))
 

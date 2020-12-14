@@ -14,55 +14,13 @@
 # limitations under the License.
 
 
-
-import itertools
-import time
 from typing import Union
 import numpy as np
 
-from nums.core.storage.storage import ArrayGrid
-from nums.core.optimizer.cluster_sim import ClusterState
 from nums.core.optimizer.comp_graph import GraphArray, TreeNode, BinaryOp, ReductionOp, Leaf, UnaryOp
-from nums.core.array.base import BlockArrayBase, Block
-from nums.core.array.blockarray import BlockArray
-from nums.core.systems.systems import System, RaySystem, SerialSystem
-from nums.core.systems.schedulers import TaskScheduler, BlockCyclicScheduler
 
 
 random_state = np.random.RandomState(1337)
-
-
-def optimized_tensordot(lhs: BlockArrayBase, rhs: BlockArrayBase, axes,
-                        copy_on_op=True) -> BlockArray:
-    # TODO: As-is, this leaks systems abstractions by requiring access to the system's underlying
-    #  scheduler.
-    system: System = lhs.system
-    if isinstance(system, RaySystem) and isinstance(system.scheduler, BlockCyclicScheduler):
-        cluster_state = ClusterState(system.scheduler.cluster_shape, system)
-    else:
-        cluster_state = ClusterState((1,), system)
-    lhs_ga: GraphArray = GraphArray.from_ba(lhs, cluster_state, copy_on_op=copy_on_op)
-    rhs_ga: GraphArray = GraphArray.from_ba(rhs, cluster_state, copy_on_op=copy_on_op)
-    tensordot_ga = lhs_ga.tensordot(rhs_ga, axes=axes)
-    global random_state
-    print("*"*50)
-    print("op grid shape", tensordot_ga.grid.grid_shape)
-    result_ga: GraphArray = RandomTS(
-        seed=random_state,
-        max_samples_per_step=1,
-        max_reduction_pairs=1,
-        force_final_action=True).solve(tensordot_ga)
-
-    # print("mem", resources[0] / np.sum(resources[0]))
-    print("mem", cluster_state.resources[0])
-    print("net_in", cluster_state.resources[1])
-    print("net_out", cluster_state.resources[2])
-    print("*"*50)
-    return BlockArray(result_ga.grid, system, result_ga.to_blocks())
-
-
-# TODO: Tie in unique_reduction_pairs
-#  This entails updating the optimizer to commit actions for multiple nodes per step.
 
 
 class ProgramState(object):
