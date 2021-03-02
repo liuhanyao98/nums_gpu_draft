@@ -1,0 +1,53 @@
+Traceback (most recent call last):
+  File "nums/experimental/benchmark_mlp_data.py", line 7, in <module>
+    from nums import numpy as nps
+  File "/home/ubuntu/nums_gpu/nums/__init__.py", line 17, in <module>
+    from nums.api import read, write, delete, read_csv
+  File "/home/ubuntu/nums_gpu/nums/api.py", line 19, in <module>
+    from nums.core.application_manager import instance as _instance
+  File "/home/ubuntu/nums_gpu/nums/core/application_manager.py", line 21, in <module>
+    from nums.core.systems.filesystem import FileSystem
+  File "/home/ubuntu/nums_gpu/nums/core/systems/filesystem.py", line 25, in <module>
+    from nums.core.storage.storage import ArrayGrid, StoredArrayS3
+  File "/home/ubuntu/nums_gpu/nums/core/storage/storage.py", line 24, in <module>
+    import boto3
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/boto3/__init__.py", line 16, in <module>
+    from boto3.session import Session
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/boto3/session.py", line 17, in <module>
+    import botocore.session
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/botocore/session.py", line 29, in <module>
+    import botocore.configloader
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/botocore/configloader.py", line 19, in <module>
+    from botocore.compat import six
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/botocore/compat.py", line 27, in <module>
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/urllib3/__init__.py", line 7, in <module>
+    from .connectionpool import HTTPConnectionPool, HTTPSConnectionPool, connection_from_url
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/urllib3/connectionpool.py", line 29, in <module>
+    from .connection import (
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/urllib3/connection.py", line 41, in <module>
+    from .util.ssl_ import (
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/urllib3/util/__init__.py", line 7, in <module>
+    from .ssl_ import (
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/urllib3/util/ssl_.py", line 11, in <module>
+    from .url import IPV4_RE, BRACELESS_IPV6_ADDRZ_RE
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/site-packages/urllib3/util/url.py", line 18, in <module>
+    SCHEME_RE = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+-]*:|/)")
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/re.py", line 233, in compile
+    return _compile(pattern, flags)
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/re.py", line 301, in _compile
+    p = sre_compile.compile(pattern, flags)
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/sre_compile.py", line 566, in compile
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/sre_compile.py", line 551, in _code
+    _compile(code, p.data, flags)
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/sre_compile.py", line 146, in _compile
+    _compile(code, p, (flags | add_flags) & ~del_flags)
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/sre_compile.py", line 187, in _compile
+    _compile(code, av, flags)
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/sre_compile.py", line 108, in _compile
+    _compile_charset(av, flags, code, fixup, fixes)
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/sre_compile.py", line 226, in _compile_charset
+    for op, av in _optimize_charset(charset, fixup, fixes):
+  File "/home/ubuntu/anaconda3/envs/python3/lib/python3.6/sre_compile.py", line 315, in _optimize_charset
+    for p, q in runs:
+KeyboardInterrupt
+======== Error: Application returned non-zero code 1
