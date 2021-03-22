@@ -16,12 +16,12 @@
 
 import logging
 import sys
-
+import time
 from nums.core import settings
 from nums.core.systems.filesystem import FileSystem
 from nums.core.systems import numpy_compute
 from nums.core.systems.systems import System, SerialSystem, RaySystem
-from nums.core.systems.gpu_systems import CupyParallelSystem
+from nums.core.systems.gpu_systems import CupyParallelSystem, CupyOsActorSystem, CupyNcclActorSystem
 from nums.core.systems.schedulers import RayScheduler, TaskScheduler, BlockCyclicScheduler
 from nums.core.array.application import ArrayApplication
 
@@ -76,7 +76,13 @@ def create(num_gpus, optimizer):
         # cluster_shape = settings.cluster_shape
         system = CupyParallelSystem()
         system.num_gpus = num_gpus
-        system.cluster_shape = (num_gpus, 1)
+        # system.cluster_shape = (num_gpus, 1)
+        system.optimizer = optimizer
+    elif system_name == "cupy-os-actor":
+        system = CupyOsActorSystem(num_gpus)
+        system.optimizer = optimizer
+    elif system_name == "cupy-nccl-actor":
+        system = CupyNcclActorSystem(num_gpus)
         system.optimizer = optimizer
     else:
         raise Exception()
@@ -89,9 +95,22 @@ def destroy():
     if _instance is None:
         return
     # This will shutdown ray if ray was started by NumS.
-    _instance.system.shutdown()
+
+    system = _instance.system
+    # print("del remaining arr ref")
+    del _instance.one_half
+    del _instance.two
+    del _instance.one
+    del _instance.zero
+    # print("del instance")
     del _instance
     _instance = None
+    # print("shutdown system")
+    system.shutdown()
+    time.sleep(2)
+    # _instance.system.shutdown()
+    
+    
 
 
 def configure_logging():

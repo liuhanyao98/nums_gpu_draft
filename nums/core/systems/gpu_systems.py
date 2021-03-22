@@ -124,9 +124,9 @@ class CupyParallelSystem(BaseGPUSystem):
         self.num_gpus = 1
         self.local_cache = local_cache
         self.immediate_gc = immediate_gc
-        self.cluster_shape: Tuple = (1, 1)
+        # self.cluster_shape: Tuple = (1, 1)
         self.optimizer = True
-        self.cluster_grid: np.ndarray = np.empty(shape=self.cluster_shape, dtype=np.object)
+        # self.cluster_grid: np.ndarray = np.empty(shape=self.cluster_shape, dtype=np.object)
 
         self.compute_imp = cupy_compute.ComputeCls()
         self.dist_dict = defaultdict(dict)   # Dict[hash(array) -> Dict[actor_id -> array]]
@@ -426,9 +426,11 @@ class ArrUID:
 class ActorSystemArrRef:
     def __init__(self, arr_uid, system):
         self.arr_uid = arr_uid
+        # print(f"init ActorSystemArrRef {self.arr_uid}")
         self.system = system
 
     def __del__(self):
+        # print(f"delete ActorSystemArrRef {self.arr_uid}")
         self.system.delete(self.arr_uid)
 
 
@@ -511,9 +513,9 @@ class GPUActor:
 
     def call_compute_interface(self, output_arr_uid, name, *args, **kwargs):
         args = [self.arrays[v]
-                if isinstance(v, ArrUID) else v for v in args]
+            if isinstance(v, ArrUID) else v for v in args]
         kwargs = {k: self.arrays[v]
-                if isinstance(v, ArrUID) else v for k, v in kwargs.items()}
+            if isinstance(v, ArrUID) else v for k, v in kwargs.items()}
 
         ret = getattr(self.compute_imp, name)(*args, **kwargs)
         self._register_new_array(output_arr_uid, ret)
@@ -592,7 +594,14 @@ def get_flatten_id(grid_entry, grid_shape):
 class GPUActorSystem(BaseGPUSystem):
     def __init__(self, num_gpus, arr_lib="torch", comm_lib="nccl"):
         self.arr_lib = arr_lib
+        self.num_gpus = num_gpus
+        self.optimizer = True
+        # self.manage_ray = True
 
+        # if ray.is_initialized():
+        #     self.manage_ray = False
+        # if self.manage_ray:
+        
         # Launch actors
         if self.arr_lib == "torch":
             cluster_file = "tcp://localhost:%d" % np.random.randint(10000, 20000)
@@ -615,25 +624,29 @@ class GPUActorSystem(BaseGPUSystem):
 
         # Meta info about actors and communication lock
         self.actor_to_rank = {self.gpu_actors[i]: i for i in range(num_gpus)}
-        self.dist_dict = defaultdict(dict)   # Dict[arr_uid -> Dict[actor -> arr_uid]]
+        self.dist_dict = defaultdict(dict)  # Dict[arr_uid -> Dict[actor -> arr_uid]]
 
         # Setup communication library
         if comm_lib == "nccl":
             self.copy_task = GPUActorSystem._copy_task_nccl
         else:
             self.copy_task = GPUActorSystem._copy_task_obj_store
-
+        # print(f"GPUActorSystem::__init__: setup actor")
+        # print(self.gpu_actors) 
+        # print([actor.setup.remote() for actor in self.gpu_actors])
         ray.get([actor.setup.remote() for actor in self.gpu_actors])
         self.actor_ct = 0
 
         # Init ComputeInterface
         super().__init__()
+    
 
     def put(self, data):
         arr_uid = ArrUID()
 
         actor0 = self.gpu_actors[0]
         actor0.put.remote(arr_uid, data)
+        # print(f"put arr_uid {arr_uid} ")
         self._register_new_array(arr_uid, actor0)
 
         for i in range(1, len(self.gpu_actors)):
@@ -650,39 +663,72 @@ class GPUActorSystem(BaseGPUSystem):
             return ray.get(self._get_owner(arr_refs.arr_uid).get.remote(arr_refs.arr_uid))
         else:
             return ray.get([self._get_owner(arr_ref.arr_uid).get.remote(arr_ref.arr_uid)
-                for arr_ref in arr_refs])
+                            for arr_ref in arr_refs])
+
 
     def touch(self, arr_ref, syskwargs):
         ray.get([self._get_owner(arr_ref.arr_uid).touch.remote()])
         return arr_ref
 
-    def call_compute_interface(self, name, *args, **kwargs):
-        # Make device placement decisions
-        syskwargs = kwargs.pop('syskwargs')
-        if name == 'bop':
-            dst_actor = None
-            for arg in itertools.chain(args, kwargs.values()):
-                if isinstance(arg, ActorSystemArrRef):
-                    dst_actor = self._get_owner(arg.arr_uid)
-                    break
-            assert dst_actor is not None
-        else:
-            gid = get_flatten_id(syskwargs['grid_entry'], syskwargs['grid_shape'])
-            actor_id = gid % len(self.gpu_actors)
-            dst_actor = self.gpu_actors[actor_id]
 
-        #print(f"GPUActorSystem::call compute {name} on {self.gpu_actors.index(dst_actor)}")
+    def get_cluster_entry(self, grid_entry, grid_shape):
+        ret = [0]
+        for i in range(len(grid_entry)):
+            dim = 1 if i == len(grid_entry) - 1 else grid_shape[i + 1]
+            ret[0] = (ret[0] + grid_entry[i]) * dim
+        ret[0] = ret[0] % len(self.gpu_actors)
+        ret.append(0)
+        return tuple(ret)
+
+
+    def call_with_options(self, name, args, kwargs, options):
+        actor_id = options["dst_actor"]
+        dst_actor = self.gpu_actors[actor_id]
 
         args = [self._distribute_to(v.arr_uid, dst_actor)
                 if isinstance(v, ActorSystemArrRef) else v for v in args]
         kwargs = {k: self._distribute_to(v.arr_uid, dst_actor)
-                if isinstance(v, ActorSystemArrRef) else v for k, v in kwargs.items()}
+                    if isinstance(v, ActorSystemArrRef) else v for k, v in kwargs.items()}
 
         arr_uid = ArrUID()
+        # print(f"GPUActorSystem::call args {args} kwargs {kwargs} on dst_actor {dst_actor}")
         dst_actor.call_compute_interface.remote(arr_uid, name, *args, **kwargs)
 
         self._register_new_array(arr_uid, dst_actor)
         return ActorSystemArrRef(arr_uid, self)
+
+
+    def call_compute_interface(self, name, *args, **kwargs):
+        # Make device placement decisions
+        syskwargs = kwargs.pop('syskwargs')
+        grid_entry = syskwargs["grid_entry"]
+        grid_shape = syskwargs["grid_shape"]
+
+        if self.optimizer:
+            cluster_entry: tuple = self.get_cluster_entry(grid_entry, grid_shape)
+            actor_id = cluster_entry[0]
+            # dst_actor = self.gpu_actors[actor_id]
+        else:
+            if name == 'bop':
+                dst_actor = None
+                for arg in itertools.chain(args, kwargs.values()):
+                    if isinstance(arg, ActorSystemArrRef):
+                        dst_actor = self._get_owner(arg.arr_uid)
+                        break
+                assert dst_actor is not None
+            else:
+                gid = get_flatten_id(syskwargs['grid_entry'], syskwargs['grid_shape'])
+                actor_id = gid % len(self.gpu_actors)
+                dst_actor = self.gpu_actors[actor_id]
+
+        # print(f"GPUActorSystem::call compute {name} on {self.gpu_actors.index(dst_actor)}")
+        # print(f"GPUActorSystem::call args {args} kwargs {kwargs}")
+        # print(f"GPUActorSystem::call compute {name} on {actor_id}")
+        options = {}
+        options["dst_actor"] = actor_id
+
+        return self.call_with_options(name, args, kwargs, options)
+
 
     def _distribute_to(self, arr_uid, dst_actor: ActorHandle):
         ret = self.dist_dict[arr_uid].get(dst_actor, None)
@@ -708,24 +754,38 @@ class GPUActorSystem(BaseGPUSystem):
             self.dist_dict[arr_uid][dst_actor] = ret
         return ret
 
+    def distribute_to(self, arr_ref, actor_id):
+        dst_actor = self.gpu_actors[actor_id]
+        return self._distribute_to(arr_ref.arr_uid, dst_actor)
+
+    def get_options(self, cluster_entry, cluster_shape):
+        # pass
+        node_entry = self.get_cluster_entry(cluster_entry, cluster_shape)
+        return {
+            "dst_actor": node_entry[0]
+        }
+
     def _register_new_array(self, arr_uid, dst_actor: ActorHandle):
         self.dist_dict[arr_uid][dst_actor] = arr_uid
+        # print(f"register GPUActorSystem {arr_uid} actor {dst_actor}")
         return arr_uid
 
     def delete(self, arr_uid):
+        # print(f"delete GPUActorSystem {arr_uid}")
         if self.dist_dict:
             for actor in self.dist_dict[arr_uid]:
                 actor.delete.remote(arr_uid)
+            del self.dist_dict[arr_uid]
 
     @ray.remote
     def _copy_task_nccl(
-        arr_uid,
-        src_actor: ActorHandle,
-        src_rank,
-        dst_actor: ActorHandle,
-        dst_rank,
-        src_barrier,
-        dst_barrier,
+            arr_uid,
+            src_actor: ActorHandle,
+            src_rank,
+            dst_actor: ActorHandle,
+            dst_rank,
+            src_barrier,
+            dst_barrier,
     ):
         shape_info = src_actor.get_shape_info.remote(arr_uid)
         a = src_actor.send_nccl.remote(arr_uid, dst_rank)
@@ -734,13 +794,13 @@ class GPUActorSystem(BaseGPUSystem):
 
     @ray.remote
     def _copy_task_obj_store(
-        arr_uid,
-        src_actor: ActorHandle,
-        src_rank,
-        dst_actor: ActorHandle,
-        dst_rank,
-        src_barrier,
-        dst_barrier,
+            arr_uid,
+            src_actor: ActorHandle,
+            src_rank,
+            dst_actor: ActorHandle,
+            dst_rank,
+            src_barrier,
+            dst_barrier,
     ):
         # print("GPUSystem send %s from %d to %d" % (arr_ref.uid, src_rank, dst_rank), flush=True)
         t = dst_actor.recv_obj_store.remote(
@@ -750,6 +810,7 @@ class GPUActorSystem(BaseGPUSystem):
 
     def shutdown(self):
         for actor in self.gpu_actors:
+            # print("shutdown actor")
             ray.get(actor.barrier.remote())
             ray.kill(actor)
         del self.gpu_actors

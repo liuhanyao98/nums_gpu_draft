@@ -1,6 +1,6 @@
 import argparse
 import time
-
+import gc
 import numpy as np
 import ray
 
@@ -228,18 +228,21 @@ def one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False)
     cluster_state = ClusterState((num_gpus, 1), app.system)
     one_ga: GraphArray = GraphArray.from_ba(app.one, cluster_state)
     X_ga = GraphArray.from_ba(X, cluster_state)
-    # print(f"X_ga block_shape {X_ga.block_shape}")
     y_ga = GraphArray.from_ba(y, cluster_state)
     W_in_1_ga = GraphArray.from_ba(W_in_1, cluster_state)
     W_1_2_ga = GraphArray.from_ba(W_1_2, cluster_state)
     W_2_out_ga = GraphArray.from_ba(W_2_out, cluster_state)
 
+    if verbose:
+        print(f"distribute weights")
     # Distribute Weights
     # distribute_weights(app.one, cluster_state)
     distribute_weights(W_in_1, cluster_state)
     distribute_weights(W_1_2, cluster_state)
     distribute_weights(W_2_out, cluster_state)
 
+    if verbose:
+        print("forward Z_1")
     Z_1_ga: GraphArray = forward(app, X_ga, W_in_1_ga)
     S_1_ga: GraphArray = opt.sigmoid(app, Z_1_ga, one_ga)
     F_1_ga: GraphArray = opt.sigmoid_deriv(app, Z_1_ga, one_ga)
@@ -248,6 +251,8 @@ def one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False)
     # print(f"Z_1.shape {Z_1.shape} Z_1.block_shape {Z_1.block_shape}")
     # F_1_ga: GraphArray = opt.relu_deriv(S_1_ga, zero_ga, one_ga)
 
+    if verbose:
+        print("forward Z_2")
     Z_2_ga: GraphArray = forward(app, S_1_ga, W_1_2_ga)
     S_2_ga: GraphArray = opt.sigmoid(app, Z_2_ga, one_ga)
     F_2_ga: GraphArray = opt.sigmoid_deriv(app, Z_2_ga, one_ga)
@@ -255,15 +260,16 @@ def one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False)
     # print(f"S_2.shape {S_2.shape} S_2.block_shape {S_2.block_shape}")
     # F_2_ga: GraphArray = opt.relu_deriv(S_2_ga, zero_ga, one_ga)
     # print("forward Z_out_ga")
+    if verbose:
+        print("forward Z_out")
     Z_out_ga: GraphArray = forward(app, S_2_ga, W_2_out_ga)
-    # print("forward y_predict_ga")
     y_predict_ga: GraphArray = opt.sigmoid(app, Z_out_ga, one_ga)
     if verbose:
         print("forward F_out_ga")
     F_out_ga: GraphArray = opt.sigmoid_deriv(app, Z_out_ga, one_ga)
-    if verbose:
-        print(F_out_ga.shape) 
-        print(F_out_ga.block_shape)
+    # if verbose:
+    #     print(F_out_ga.shape) 
+    #     print(F_out_ga.block_shape)
     # y_predict_ga: GraphArray = opt.relu(S_out_ga, zero_ga)
     initend = time.time()
     # print("-----------------------------start back propogation-------------------------------")
@@ -348,8 +354,8 @@ def one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False)
 
 
 def np_init_weights(app, X, y, dtype):
-    dim_1 = 8192  # neurons in the first layer
-    dim_2 = 8192  # neurons in the second layer
+    dim_1 = 4096  # neurons in the first layer
+    dim_2 = 4096  # neurons in the second layer
 
     W_in_1 = app.random.normal(size=(X.shape[1], dim_1)).astype(dtype)
     W_1_2 = app.random.normal(size=(dim_1, dim_2)).astype(dtype)
@@ -358,8 +364,8 @@ def np_init_weights(app, X, y, dtype):
 
 
 def data_init_weights(app: ArrayApplication, num_gpus, X, y, verbose=False):
-    dim_1 = 8192  # neurons in the first layer
-    dim_2 = 8192  # neurons in the second layer
+    dim_1 = 4096  # neurons in the first layer
+    dim_2 = 4096  # neurons in the second layer
 
     W_in_1 = app.random.normal(shape=(X.shape[1], dim_1), block_shape=(X.block_shape[1], dim_1), dtype=X.dtype)
     W_1_2 = app.random.normal(shape=(dim_1, dim_2), block_shape=(dim_1, dim_2), dtype=X.dtype)
@@ -385,7 +391,7 @@ def sample(app: ArrayApplication, sample_size, feature, num_gpus, dtype):
     return X_train, y_train
 
 
-def benchmark_mlp(num_gpus, N_list, system_class_list, d=2000, optimizer=True, dtype=np.float32):
+def benchmark_mlp(num_gpus, N_list, system_class_list, d=1000, optimizer=True, dtype=np.float32):
     format_string = "%20s,%10s,%10s,%10s,%10s,%10s"
     print(format_string % ("Library", "N", "Cost", "CostOpt", "CostInit", "CV"))
     global app
@@ -440,10 +446,11 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=2000, optimizer=True, d
 
                     # Benchmark one step MLP
                     def func():
+                        print("start func")
                         tic = time.time()
                         if optimizer:
                             # print("one_step_fit_opt")
-                            toc_init, toc_opt = one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus)
+                            toc_init, toc_opt = one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False)
                             # print("feedforward_opt")
                             # toc_init, toc_opt = feedforward_opt(app, X, W_in_1, W_1_2, W_2_out, num_gpus)
                         else:
@@ -452,12 +459,15 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=2000, optimizer=True, d
                             toc_opt = one_step_fit(app, X, y, W_in_1, W_1_2, W_2_out)
 
                         toc = time.time()
+                        print("end func")
                         return toc - tic, toc_opt - tic, toc_init - tic, None
 
                     costs, costs_opt, costs_init = benchmark_func(func)
 
-                    del (X, y, app, W_in_1, W_1_2, W_2_out)
+                    del (X, y, W_in_1, W_1_2, W_2_out)
                     # del (X, app)
+                    am.destroy()
+                    # gc.collect()
             # except Exception:
             else:
                 costs = [-1]
@@ -473,8 +483,9 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=2000, optimizer=True, d
                 "%.4f" % np.mean(costs_init),
                 "%.2f" % (np.std(costs) / np.mean(costs)),
             )
+
             print(log_str)
-            with open("result_lr.csv", "a") as f:
+            with open("result_mlp_data.csv", "a") as f:
                 f.write(log_str + "\n")
 
 
@@ -490,16 +501,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
     num_gpus = args.num_gpus or get_number_of_gpus()
     optimizer = args.optimizer
+
     # try:
-    #     ray.init(address="auto")
+    #     # ray.init(address="auto")
+    ray.init(address='auto', _redis_password='5241590000000000')
     # except ConnectionError:
     #     ray.init()
 
     benchmark_mlp(
         num_gpus,
         N_list=[
-            # 1,
+            # 2000,
+            # 4000,
+            # 8000,
+            16000,
+            32000,
             40000,
+            42000,
+            44000,
             # 0.5e6 / 4,
             # 1e6 / 4,
             # 2e6 / 4,
@@ -519,12 +538,12 @@ if __name__ == "__main__":
             # CupyRaySystem,
             # TorchGPURaySystem,
             # CupyOsActorSystem,
-            # CupyNcclActorSystem,
-            CupyParallelSystem,
-            "Cupy",
+            CupyNcclActorSystem,
+            # CupyParallelSystem,
+            # "Cupy",
             # "Numpy",
         ],
         optimizer=optimizer,
     )
 
-
+    ray.shutdown()

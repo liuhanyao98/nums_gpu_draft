@@ -75,7 +75,7 @@ def matmul_opt(app, W, D, num_gpus):
 def benchmark_bop(num_gpus, N_list, system_class_list, d=400000, optimizer=True, dtype=np.float32):
     format_string = "%20s,%10s,%10s,%10s,%10s,%10s"
     print(format_string % ("Library", "N", "Cost", "CostOpt", "CostInit", "CV"))
-    global app
+    # global app
 
     for N in N_list:
         N = int(N)
@@ -120,11 +120,14 @@ def benchmark_bop(num_gpus, N_list, system_class_list, d=400000, optimizer=True,
 
                     W = app.ones(shape=(d1, d2), block_shape=(d1, d2 // num_gpus), dtype=dtype)
                     # print("W", W)
+                    # print(W.shape)
                     D = app.ones(shape=(d2, N), block_shape=(d2 // num_gpus, N), dtype=dtype)
                     # print("D", D)
+                    # print(D.shape)
                     # X = app.ones((N, d), block_shape=(N // num_gpus, d), dtype=dtype)
                     # Benchmark bop
                     def func():
+                        # print("start func")
                         tic = time.time()
                         if optimizer:
                             toc_init, toc_opt = matmul_opt(app, W, D, num_gpus)
@@ -132,14 +135,16 @@ def benchmark_bop(num_gpus, N_list, system_class_list, d=400000, optimizer=True,
                         else:
                             Z = (W @ D).touch()
                             # Z = (X.T @ X).touch()
-
+                        # print("end func")
                         toc = time.time()
                         return toc - tic, 0, 0, None
 
                     costs, costs_opt, costs_init = benchmark_func(func)
                     
-                    # del (X, app)
-                    del (W, D, app)
+                    # print("del W D")
+                    del (W, D)
+                    am.destroy()
+                    # print("delete w d app")
             #except Exception:
             else:
                 costs = [-1]
@@ -172,15 +177,18 @@ if __name__ == "__main__":
     num_gpus = args.num_gpus or get_number_of_gpus()
     optimizer = args.optimizer
     # try:
-    #     ray.init(address="auto")
+    #     ray.init(address='auto', _redis_password='5241590000000000')
+    #     # ray.init(address="auto")
     # except ConnectionError:
     #     ray.init()
+    ray.init(address='auto', _redis_password='5241590000000000')
 
     benchmark_bop(
         num_gpus,
         N_list=[
-            4000,
-            #50000,
+            # 5000,
+            # 6000,
+            10000,
             # 0.5e6 / 4,
             # 1e6 / 4,
             # 2e6 / 4,
@@ -200,12 +208,14 @@ if __name__ == "__main__":
             # CupyRaySystem,
             # TorchGPURaySystem,
             # CupyOsActorSystem,
-            # CupyNcclActorSystem,
-            CupyParallelSystem,
-            "Cupy",
+            CupyNcclActorSystem,
+            # CupyParallelSystem,
+            # "Cupy",
             # "Numpy",
         ],
         optimizer=optimizer,
     )
+
+    ray.shutdown()
 
 

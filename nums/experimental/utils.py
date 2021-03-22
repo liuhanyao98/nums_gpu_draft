@@ -8,7 +8,7 @@ def check_block_integrity(arr):
         assert arr.blocks[grid_entry].shape == arr.grid.get_block_shape(grid_entry)
 
 
-def benchmark_func(func, repeat=2, warmup=1):
+def benchmark_func(func, repeat=3, warmup=1):
     for i in range(warmup):
         gc.collect()
         func()
@@ -17,17 +17,21 @@ def benchmark_func(func, repeat=2, warmup=1):
     costs_opt = []
     costs_init = []
     for i in range(repeat):
-        gc.collect()
+        n = gc.collect()
+        # print(f"gc collect {n} objects")
         cost, cost_opt, cost_init, _ = func()
         costs.append(cost)
+        print(f"cost: {cost}")
         costs_opt.append(cost_opt)
         costs_init.append(cost_init)
-
+    n = gc.collect()
+    # print(f"end collect {n} objects")
+    
 
     return costs, costs_opt, costs_init
 
 
-def benchmark_print(func, repeat=2, warmup=1):
+def benchmark_print(func, repeat=1, warmup=0):
     for i in range(warmup):
         func()
 

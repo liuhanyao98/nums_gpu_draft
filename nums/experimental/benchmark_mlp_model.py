@@ -353,9 +353,9 @@ def one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False)
 
     return initend, endtime
 
-def np_init_weights(app, X, y, dtype):
+def np_init_weights(app, X, y, d2, dtype):
     dim_1 = 4096  # neurons in the first layer
-    dim_2 = 100000  # neurons in the second layer
+    dim_2 = d2  # neurons in the second layer
 
     W_in_1 = app.random.normal(size=(X.shape[1], dim_1)).astype(dtype)
     W_1_2 = app.random.normal(size=(dim_1, dim_2)).astype(dtype)
@@ -363,9 +363,9 @@ def np_init_weights(app, X, y, dtype):
     return W_in_1, W_1_2, W_2_out
 
 
-def model_init_weights(app: ArrayApplication, num_gpus, X, y, verbose=False):
+def model_init_weights(app: ArrayApplication, num_gpus, X, y, d2, verbose=False):
     dim_1 = 4096  # neurons in the first layer
-    dim_2 = 100000  # neurons in the second layer
+    dim_2 = d2  # neurons in the second layer
     W_in_1 = app.random.normal(shape=(X.shape[1], dim_1), block_shape=(X.shape[1] // num_gpus, dim_1), dtype=X.dtype)
     W_1_2 = app.random.normal(shape=(dim_1, dim_2), block_shape=(dim_1, dim_2 // num_gpus), dtype=X.dtype)
     W_2_out = app.random.normal(shape=(dim_2, y.shape[1]), block_shape=(dim_2 // num_gpus, y.block_shape[1]),
@@ -393,13 +393,13 @@ def sample(app: ArrayApplication, sample_size, feature, num_gpus, dtype):
 
 
 def benchmark_mlp(num_gpus, N_list, system_class_list, d=140000, optimizer=True, dtype=np.float32):
-    format_string = "%20s,%10s,%10s,%10s,%10s,%10s"
-    print(format_string % ("Library", "N", "Cost", "CostOpt", "CostInit", "CV"))
+    format_string = "%20s,%10s,%10s,%10s,%10s,%10s,%10s,%10s"
+    print(format_string % ("Library", "N", "d_in", "d_2", "Cost", "CostOpt", "CostInit", "CV"))
     global app
 
-    for N in N_list:
-        N = int(N)
-
+    for d2 in N_list:
+        N = 2000
+        d = 20000
         for system_class in system_class_list:
             # try:
             if True:
@@ -412,7 +412,7 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=140000, optimizer=True,
                     app = arr_lib
 
                     X, y = np_sample(np, sample_size=N, feature=d, dtype=dtype)
-                    W_in_1, W_1_2, W_2_out = np_init_weights(np, X, y, dtype=dtype)
+                    W_in_1, W_1_2, W_2_out = np_init_weights(np, X, y, d2, dtype=dtype)
 
                     X = cp.asarray(X)
                     y = cp.asarray(y)
@@ -448,7 +448,7 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=140000, optimizer=True,
                     X, y = sample(app, sample_size=N, feature=d, num_gpus=num_gpus, dtype=dtype)
                     # print(f"X.shape {X.shape} X.block_shape {X.block_shape}")
                     # print(f"y.shape {y.shape} y.block_shape {y.block_shape}")
-                    W_in_1, W_1_2, W_2_out = model_init_weights(app, num_gpus, X, y)
+                    W_in_1, W_1_2, W_2_out = model_init_weights(app, num_gpus, X, y, d2)
 
                     # X = sample(app, sample_size=N, feature=1000, num_gpus=num_gpus)
                     # print("b", flush=True)
@@ -486,13 +486,15 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=140000, optimizer=True,
                 # system_class.__name__,
                 name,
                 "%d" % N,
+                "%d" % d,
+                "%d" % d2,
                 "%.4f" % np.mean(costs),
                 "%.4f" % np.mean(costs_opt),
                 "%.4f" % np.mean(costs_init),
                 "%.2f" % (np.std(costs) / np.mean(costs)),
             )
             print(log_str)
-            with open("result_lr.csv", "a") as f:
+            with open("result_mlp_model.csv", "a") as f:
                 f.write(log_str + "\n")
 
 
@@ -516,7 +518,24 @@ if __name__ == "__main__":
     benchmark_mlp(
         num_gpus,
         N_list=[
-            2000,
+            # 2000,
+            4096,
+            8192,
+            16384,
+            32768,
+            70000,
+            140000,
+            160000,
+            # (4096, 1000),
+            # (8192, 2000),
+            # (16384, 4000),
+            # (32768, 8000),
+            # (5000, 3000),
+            # (10000, 6000),
+            # (20000, 12000),
+            # (30000, 20000),
+            # (70000, 50000),
+            # (140000, 100000),
             # 3000,
             # 0.5e6 / 4,
             # 1e6 / 4,
