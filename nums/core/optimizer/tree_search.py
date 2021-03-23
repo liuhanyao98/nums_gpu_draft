@@ -51,22 +51,6 @@ class ProgramState(object):
         for tnode in start_node.get_frontier():
             self.add_frontier_node(tnode)
 
-
-    def find_min_action(self, min_actions):
-        #return min_actions[np.random.choice(np.arange(len(min_actions)))]
-
-        if len(min_actions) == 1:
-            return min_actions[0]
-        min_action = None
-        min_node_id = min_actions[0][1]["node_id"]
-        for action in min_actions:
-            node_id = action[1]["node_id"]
-            if node_id <= min_node_id:
-                min_node_id = node_id
-                min_action = action
-        return min_action
-
-
     def get_bc_action(self, tnode: TreeNode):
         # This is hacky, but no good way to do it w/ current abstractions.
         if isinstance(tnode, BinaryOp):
@@ -86,26 +70,6 @@ class ProgramState(object):
         else:
             raise Exception()
         return actions
-
-    # def get_bc_action(self, tnode: TreeNode):
-    #     # This is hacky, but no good way to do it w/ current abstractions.
-    #     if isinstance(tnode, BinaryOp):
-    #         grid_entry = self.get_tnode_grid_entry(tnode)
-    #         node_id = self.arr.cluster_state.get_cluster_entry(grid_entry)
-    #         actions = [(tnode.tree_node_id, {"node_id": node_id})]
-    #     elif isinstance(tnode, ReductionOp):
-    #         leaf_ids = tuple(tnode.leafs_dict.keys())[:2]
-    #         grid_entry = self.get_tnode_grid_entry(tnode)
-    #         node_id = self.arr.cluster_state.get_cluster_entry(grid_entry)
-    #         actions = [(tnode.tree_node_id, {"node_id": node_id,
-    #                                          "leaf_ids": leaf_ids})]
-    #     elif isinstance(tnode, UnaryOp):
-    #         grid_entry = self.get_tnode_grid_entry(tnode)
-    #         node_id = self.arr.cluster_state.get_cluster_entry(grid_entry)
-    #         actions = [(tnode.tree_node_id, {"node_id": node_id})]
-    #     else:
-    #         raise Exception()
-    #     return actions
 
     def add_frontier_node(self, tnode: TreeNode):
         # This is a frontier node.
@@ -158,8 +122,6 @@ class ProgramState(object):
     def objective(self, resources):
         # Our simple objective.
         return np.sum(resources[1:])
-        # max_axes = tuple(np.arange(1, len(self.arr.cluster_state.cluster_shape) + 1))
-        # return np.sum(np.max(resources, axis=max_axes))
 
     def get_tnode_grid_entry(self, tnode: TreeNode):
         if tnode.parent is None:
@@ -208,8 +170,6 @@ class TreeSearch(object):
         raise NotImplementedError()
 
     def solve(self, arr: GraphArray):
-        # reduce_node = arr.graphs[0][0]
-        # print("solve for", reduce_node)
         state: ProgramState = ProgramState(arr,
                                            max_reduction_pairs=self.max_reduction_pairs,
                                            force_final_action=self.force_final_action)
@@ -217,7 +177,6 @@ class TreeSearch(object):
         while True:
             num_steps += 1
             state, cost, is_done = self.step(state)
-            # print(num_steps, state.num_nodes(), cost)
             if is_done:
                 break
         return state.arr
@@ -278,7 +237,6 @@ class RandomTS(TreeSearch):
         for tnode_id in tnode_id_sample:
             actions += state.tnode_map[tnode_id][1]
         return actions
-            
 
     def step(self, state: ProgramState):
         # Sampling slows things down because for some reason,
@@ -289,31 +247,13 @@ class RandomTS(TreeSearch):
         if len(actions) == 0:
             # We're done.
             return state, state.objective(state.arr.cluster_state.resources), True
-        # min_actions = []
-        # min_action = None
-        # min_cost = np.float64("inf")
-        # for i in range(len(actions)):
-        #     action = actions[i]
-        #     action_cost = state.simulate_action(action)
-        #     if action_cost < min_cost:
-        #         min_actions = []
-        #         min_actions.append(action)
-        #         min_cost = action_cost
-        #     elif action_cost == min_cost:
-        #         min_actions.append(action)
-        # min_action = state.find_min_action(min_actions)
-        # curr_cost = state.commit_action(min_action)
-        # return state, curr_cost, False
-
         min_action = None
         min_cost = np.float64("inf")
         for i in range(len(actions)):
             action = actions[i]
             action_cost = state.simulate_action(action)
-            # print("action", action, "cost", action_cost)
-            if action_cost <= min_cost:
+            if action_cost < min_cost:
                 min_action = action
                 min_cost = action_cost
-        # print("commit action", min_action, "on node: ", state.tnode_map[min_action[0]], flush=True)
         curr_cost = state.commit_action(min_action)
         return state, curr_cost, False
