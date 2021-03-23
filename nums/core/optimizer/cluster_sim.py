@@ -30,7 +30,7 @@ class ClusterState(object):
         self.mem_idx, self.net_in_idx, self.net_out_idx = 0, 1, 2
         self.resources: np.ndarray = np.zeros(shape=tuple([3]+list(self.cluster_shape)),
                                               dtype=np.float)
-        # Dict from block id to BlockState.
+        # Dict from block id to Block.
         self.blocks = {}
         # Dict from block id to list of node id.
         self.block_nodes = {}

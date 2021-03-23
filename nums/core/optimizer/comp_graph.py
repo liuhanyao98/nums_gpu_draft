@@ -826,6 +826,10 @@ class GraphArray(object):
         sum_dims = list(itertools.product(*map(range, this_sum_axes)))
         for i in this_dims:
             for j in other_dims:
+                # A \in \R^{I \times K}
+                # B \in \R^{K \times J}
+                # C \in \R^{I \times J}
+                # C[i, j] = sum_k^K { A[i, k] * B[k, j] }
                 grid_entry = tuple(i + j)
                 if len(sum_dims) == 1:
                     k = sum_dims[0]
