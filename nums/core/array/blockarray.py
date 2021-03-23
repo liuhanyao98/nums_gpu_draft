@@ -125,19 +125,24 @@ class BlockArray(BlockArrayBase):
         self.system.get(oids)
         return self
 
-    def reshape(self, shape=None, **kwargs):
+    def reshape(self, *shape, **kwargs):
         block_shape = kwargs.get("block_shape", None)
         if array_utils.is_int(shape):
             shape = (shape,)
-        if (block_shape is None or self.block_shape == block_shape) \
-                and (shape is None or self.shape == shape):
-            return Reshape()(self, self.shape, self.block_shape)
-        if shape is None:
+        elif len(shape) == 0:
             shape = self.shape
+        elif isinstance(shape[0], (tuple, list)):
+            assert len(shape) == 1
+            shape = shape[0]
         else:
-            shape = Reshape.compute_shape(self.shape, shape)
+            assert all(np.issubdtype(type(n), int) for n in shape)
+        shape = Reshape.compute_shape(self.shape, shape)
         if block_shape is None:
-            block_shape = self._get_and_register_block_shape(shape)
+            if shape == self.shape:
+                # This is a noop.
+                block_shape = self.block_shape
+            else:
+                block_shape = self._get_and_register_block_shape(shape)
         return Reshape()(self, shape, block_shape)
 
     # TODO (hme): Remove this during engine/sys refactor.
@@ -210,7 +215,7 @@ class BlockArray(BlockArrayBase):
                 tmp.append(entry.get())
             else:
                 tmp.append(entry)
-        ss = tmp
+        ss = tuple(tmp)
         is_handled_advanced = True
         if len(ss) > 1:
             # Check if all entries are full slices except the last entry.
@@ -218,7 +223,7 @@ class BlockArray(BlockArrayBase):
                 is_handled_advanced = is_handled_advanced and (isinstance(entry, slice)
                                                                and entry.start is None
                                                                and entry.stop is None)
-        if is_handled_advanced and selection.is_advanced_selection((ss[-1],)):
+        if is_handled_advanced and array_utils.is_array_like(ss[-1]):
             # Treat this as a shuffle.
             return self._advanced_single_array_subscript(sel=(ss[-1],), axis=len(ss)-1)
 
@@ -323,6 +328,8 @@ class BlockArray(BlockArrayBase):
         if isinstance(other, BlockArray):
             return other
         if isinstance(other, np.ndarray):
+            # TODO (MWE): for self.shape (4,) self.block_shape: (1,),
+            #  other.shape: (1, 4) this fails due to a failure to broadcast block shape
             return self.from_np(other, self.block_shape, False, self.system)
         if isinstance(other, list):
             other = np.array(other)
@@ -367,9 +374,7 @@ class BlockArray(BlockArrayBase):
                                 dtype=result_dtype.__name__)
         result = BlockArray(result_grid, self.system)
 
-        if op_name in settings.np_pairwise_reduction_map:
-            # Do a pairwise reduction with the pairwise reduction op.
-            pairwise_op_name = settings.np_pairwise_reduction_map.get(op_name, op_name)
+        if op_name in settings.np_bop_reduction_set:
             if axis is None:
                 reduced_block: Block = None
                 for grid_entry in self.grid.get_entry_iterator():
@@ -377,7 +382,7 @@ class BlockArray(BlockArrayBase):
                         reduced_block = result_blocks[grid_entry]
                         continue
                     next_block = result_blocks[grid_entry]
-                    reduced_block = reduced_block.bop(pairwise_op_name, next_block, {})
+                    reduced_block = reduced_block.bop_reduce(op_name, other=next_block)
                 if result.shape == ():
                     result.blocks[()] = reduced_block
                 else:
@@ -397,7 +402,8 @@ class BlockArray(BlockArrayBase):
                         if reduced_block is None:
                             reduced_block = next_block
                         else:
-                            reduced_block = reduced_block.bop(pairwise_op_name, next_block, {})
+                            reduced_block = reduced_block.bop_reduce(op_name, other=next_block)
+
                     result.blocks[result_grid_entry] = reduced_block
         else:
             op_func = np.__getattribute__(op_name)
@@ -409,7 +415,8 @@ class BlockArray(BlockArrayBase):
 
     def __matmul__(self, other):
         if len(self.shape) > 2:
-            return self.tensordot(other, 2)
+            # TODO: (bcp) NumPy's implementation does a stacked matmul, which is not supported yet.
+            raise NotImplementedError("Matrix multiply for tensors of rank > 2 not supported yet.")
         else:
             return self.tensordot(other, 1)
 
@@ -606,6 +613,9 @@ class BlockArray(BlockArrayBase):
                                       result_shape=None,
                                       system=self.system)
 
+    def __invert__(self):
+        return self.ufunc("invert")
+
     __iadd__ = __add__
     __isub__ = __sub__
     __imul__ = __mul__
@@ -721,7 +731,7 @@ class Reshape(object):
                     new_shape.append(dim)
         else:
             new_shape = input_shape
-        assert np.product(shape) == np.product(new_shape)
+        assert size == np.product(new_shape)
         return new_shape
 
     def _group_index_lists_by_block(self, dst_slice_tuples,

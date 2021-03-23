@@ -178,6 +178,7 @@ class ComputeCls(ComputeImp):
         op_func = np.__getattribute__(op_name)
         if transposed:
             arr = arr.T
+
         return op_func(arr, axis=axis, keepdims=keepdims)
 
     # This is essentially a map.
@@ -192,13 +193,14 @@ class ComputeCls(ComputeImp):
             for i, (start, stop) in enumerate(block_slice_tuples):
                 arr = res[i]
                 arr += start
+            shape = res[0].shape
+            res = list(res)
+            res.append(shape)
+            return tuple(res)
         else:
             assert isinstance(x, np.ndarray) and isinstance(y, np.ndarray)
-            res = np.where(arr, x, y)
-        shape = res[0].shape
-        res = list(res)
-        res.append(shape)
-        return tuple(res)
+            assert arr.shape == x.shape == y.shape
+            return np.where(arr, x, y)
 
     def xlogy(self, arr_x, arr_y):
         return scipy.special.xlogy(arr_x, arr_y)
@@ -237,6 +239,23 @@ class ComputeCls(ComputeImp):
             ufunc = scipy.special.__getattribute__(op)
         return ufunc(a1, a2)
 
+    def bop_reduce(self, op, a1, a2, a1_T, a2_T):
+        if a1_T:
+            a1 = a1.T
+        if a2_T:
+            a2 = a2.T
+
+        reduce_op = np.__getattribute__(op)
+
+        a = np.stack([a1, a2], axis=0)
+        r = reduce_op(a, axis=0, keepdims=False)
+
+        if a1 is np.nan or a2 is np.nan or r is np.nan:
+            assert np.isscalar(a1) and np.isscalar(a2) and np.isscalar(r)
+        else:
+            assert a1.shape == a2.shape == r.shape
+        return r
+
     def qr(self, *arrays, mode="reduced", axis=None):
         if len(arrays) > 1:
             assert axis is not None
@@ -258,8 +277,16 @@ class ComputeCls(ComputeImp):
 
     # Boolean
 
-    def allclose(self, a: np.ndarray, b: np.ndarray, rtol, atol):
-        return np.allclose(a, b, rtol, atol)
+    def array_compare(self, func_name: str, a: np.ndarray, b: np.ndarray, args):
+        eq_func = getattr(np, func_name)
+        if func_name == "allclose":
+            assert len(args) == 2
+            rtol = args[0]
+            atol = args[1]
+            return np.allclose(a, b, rtol, atol)
+
+        assert len(args) == 0
+        return eq_func(a, b)
 
     # Logic
 

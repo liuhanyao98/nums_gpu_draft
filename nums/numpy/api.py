@@ -58,6 +58,7 @@ nan = NAN = NaN = np.nan
 
 bool = np.bool
 bool_ = np.bool_
+uint = np.uint
 uint8 = np.uint8
 uint16 = np.uint16
 uint32 = np.uint32
@@ -229,6 +230,17 @@ def diag(v: BlockArray, k=0) -> BlockArray:
     return app.diag(v)
 
 
+def atleast_1d(*arys):
+    return _instance().atleast_1d(*arys)
+
+
+def atleast_2d(*arys):
+    return _instance().atleast_2d(*arys)
+
+
+def atleast_3d(*arys):
+    return _instance().atleast_3d(*arys)
+
 ############################################
 # Manipulation Ops
 ############################################
@@ -264,7 +276,7 @@ def logspace(start, stop, num=50, endpoint=True, base=10.0, dtype=None, axis=0):
 
 
 ############################################
-# Matrix Ops
+# Linear Algebra Ops
 ############################################
 
 
@@ -279,26 +291,60 @@ def matmul(x1: BlockArray, x2: BlockArray) -> BlockArray:
                               arr_2=x2)
 
 
+def inner(a: BlockArray, b: BlockArray):
+    assert len(a.shape) == len(b.shape) == 1, "Only single-axis inputs supported."
+    return a.T @ b
+
+
+def outer(a: BlockArray, b: BlockArray):
+    assert len(a.shape) == len(b.shape) == 1, "Only single-axis inputs supported."
+    return a.reshape((a.shape[0], 1)) @ b.reshape((1, b.shape[0]))
+
+
 ############################################
 # Shape Ops
 ############################################
 
 
-def ndim(x: BlockArray):
-    return x.ndim
+def shape(a: BlockArray):
+    return a.shape
 
 
-def reshape(x: BlockArray, shape):
-    block_shape = _instance().compute_block_shape(shape, x.dtype)
-    return x.reshape(shape, block_shape=block_shape)
+def size(a: BlockArray):
+    return a.size
 
 
-def expand_dims(x: BlockArray, axis):
-    return x.expand_dims(axis)
+def ndim(a: BlockArray):
+    return a.ndim
 
 
-def squeeze(x: BlockArray):
-    return x.squeeze()
+def reshape(a: BlockArray, shape):
+    block_shape = _instance().compute_block_shape(shape, a.dtype)
+    return a.reshape(shape, block_shape=block_shape)
+
+
+def expand_dims(a: BlockArray, axis):
+    return a.expand_dims(axis)
+
+
+def squeeze(a: BlockArray, axis=None):
+    assert axis is None, "axis not supported."
+    return a.squeeze()
+
+
+def transpose(a: BlockArray, axes=None):
+    assert axes is None, "axes not supported."
+    return a.T
+
+
+############################################
+# Misc
+############################################
+
+
+def copy(a: BlockArray, order='K', subok=False):
+    assert order == 'K' and not subok, "Only default args supported."
+    return a.copy()
 
 
 ############################################
@@ -340,7 +386,7 @@ def argmin(a: BlockArray, axis=None, out=None):
     return _instance().argop("argmin", a, axis=axis)
 
 
-def argmax(a, axis=None, out=None):
+def argmax(a: BlockArray, axis=None, out=None):
     if len(a.shape) > 1:
         raise NotImplementedError("argmax currently only supports one-dimensional arrays.")
     if out is not None:
@@ -377,21 +423,87 @@ def std(a: BlockArray, axis=None, dtype=None, out=None, ddof=0, keepdims=False):
     return _instance().std(a, axis=axis, ddof=ddof, keepdims=keepdims, dtype=dtype)
 
 
-def where(condition, x=None, y=None):
-    assert x is None and y is None, "x and y parameters not supported."
-    return _instance().where(condition)
+def where(condition: BlockArray, x: BlockArray = None, y: BlockArray = None):
+    return _instance().where(condition, x, y)
 
+
+def all(a: BlockArray, axis=None, out=None, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().reduce("all", a, axis=axis, keepdims=keepdims)
+
+
+def alltrue(a: BlockArray, axis=None, out=None, dtype=None, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().reduce("alltrue", a, axis=axis, keepdims=keepdims, dtype=dtype)
+
+
+def any(a: BlockArray, axis=None, out=None, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().reduce("any", a, axis=axis, keepdims=keepdims)
+
+
+############################################
+# NaN Ops
+############################################
+
+
+def nanmax(a: BlockArray, axis=None, out=None, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().reduce("nanmax", a, axis=axis, keepdims=keepdims)
+
+
+def nanmin(a: BlockArray, axis=None, out=None, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().reduce("nanmin", a, axis=axis, keepdims=keepdims)
+
+
+def nansum(a: BlockArray, axis=None, dtype=None, out=None, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().reduce("nansum", a, axis=axis, dtype=dtype, keepdims=keepdims)
+
+
+def nanmean(a: BlockArray, axis=None, dtype=None, out=None, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().nanmean(a, axis=axis, dtype=dtype, keepdims=keepdims)
+
+
+def nanvar(a, axis=None, dtype=None, out=None, ddof=0, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().nanvar(a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims)
+
+
+def nanstd(a, axis=None, dtype=None, out=None, ddof=0, keepdims=False):
+    if out is not None:
+        raise NotImplementedError("'out' is currently not supported.")
+    return _instance().nanstd(a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims)
 
 ############################################
 # Utility Ops
 ############################################
 
 
+def array_equal(a: BlockArray, b: BlockArray, equal_nan=False) -> BlockArray:
+    if equal_nan is not False:
+        raise NotImplementedError("equal_nan=True not supported.")
+    return _instance().array_equal(a, b)
+
+
+def array_equiv(a: BlockArray, b: BlockArray) -> BlockArray:
+    return _instance().array_equiv(a, b)
+
+
 def allclose(a: BlockArray, b: BlockArray, rtol=1.e-5, atol=1.e-8, equal_nan=False) -> BlockArray:
     if equal_nan is not False:
         raise NotImplementedError("equal_nan=True not supported.")
     return _instance().allclose(a, b, rtol, atol)
-
 
 ############################################
 # Generated Ops (Unary, Binary)

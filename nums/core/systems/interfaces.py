@@ -119,6 +119,9 @@ class ComputeInterface(object):
     def bop(self, op, a1, a2, a1_shape, a2_shape, a1_T, a2_T, axes, syskwargs: Dict):
         raise NotImplementedError()
 
+    def bop_reduce(self, op, a1, a2, a1_T, a2_T, syskwargs: Dict):
+        raise NotImplementedError()
+
     def split(self, arr, indices_or_sections, axis, transposed, syskwargs: Dict):
         raise NotImplementedError()
 
@@ -136,7 +139,7 @@ class ComputeInterface(object):
     def inv(self, arr, syskwargs: Dict):
         raise NotImplementedError()
 
-    def allclose(self, a, b, rtol, atol, syskwargs: Dict):
+    def array_compare(self, func_name, a, b, args, syskwargs: Dict):
         raise NotImplementedError()
 
     def map_uop(self, op_name, arr, args, kwargs, syskwargs: Dict):
