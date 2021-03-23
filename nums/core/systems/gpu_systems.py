@@ -13,10 +13,12 @@ from nums.core.settings import np_ufunc_map
 from nums.core.systems.interfaces import RNGInterface
 from nums.core.systems.utils import extract_functions
 
+
 def cupy_used_bytes():
     import cupy as cp
     mempool = cp.get_default_memory_pool()
     return mempool.used_bytes()
+
 
 class BaseGPUSystem(object):
     def __init__(self):
@@ -124,9 +126,7 @@ class CupyParallelSystem(BaseGPUSystem):
         self.num_gpus = 1
         self.local_cache = local_cache
         self.immediate_gc = immediate_gc
-        # self.cluster_shape: Tuple = (1, 1)
         self.optimizer = True
-        # self.cluster_grid: np.ndarray = np.empty(shape=self.cluster_shape, dtype=np.object)
 
         self.compute_imp = cupy_compute.ComputeCls()
         self.dist_dict = defaultdict(dict)   # Dict[hash(array) -> Dict[actor_id -> array]]
@@ -161,53 +161,8 @@ class CupyParallelSystem(BaseGPUSystem):
         ret.append(0)
         return tuple(ret)
 
-    # def get_cluster_entry(self, grid_entry):
-    #     cluster_entry = []
-    #     num_grid_entry_axes = len(grid_entry)
-    #     num_cluster_axes = len(self.cluster_shape)
-    #     if num_grid_entry_axes <= num_cluster_axes:
-    #         # When array has fewer or equal # of axes than cluster.
-    #         for cluster_axis in range(num_cluster_axes):
-    #             if cluster_axis < num_grid_entry_axes:
-    #                 cluster_dim = self.cluster_shape[cluster_axis]
-    #                 grid_entry_dim = grid_entry[cluster_axis]
-    #                 cluster_entry.append(grid_entry_dim % cluster_dim)
-    #             else:
-    #                 cluster_entry.append(0)
-    #     elif num_grid_entry_axes > num_cluster_axes:
-    #         # When array has more axes then cluster.
-    #         for cluster_axis in range(num_cluster_axes):
-    #             cluster_dim = self.cluster_shape[cluster_axis]
-    #             grid_entry_dim = grid_entry[cluster_axis]
-    #             cluster_entry.append(grid_entry_dim % cluster_dim)
-    #         # Ignore trailing axes, as these are "cycled" to 0 by assuming
-    #         # the dimension of those cluster axes is 1.
-    #     # print(f"get_cluster_entry {grid_entry} on {cluster_entry}")
-    #     return tuple(cluster_entry)
-
     def call_with_options(self, name, args, kwargs, options):
-        # print(f"CupyParallelSystem::call args {args} kwargs {kwargs}")
-        # Make device placement decisions
-        # if "syskwargs" in kwargs:
-        #     syskwargs = kwargs.pop('syskwargs')
-        #     grid_entry = syskwargs["grid_entry"]
-        #     grid_shape = syskwargs["grid_shape"]
-        
-            # cluster_entry: tuple = self.get_cluster_entry(grid_entry)
-            # print(f"CupyParallelSystem::call grid entry {grid_entry} and cluster entry {cluster_entry}")
         dst_actor = options["dst_actor"]
-            # print(f"CupyParallelSystem::call {name} on {dst_actor}")
-        # if self.optimizer == False:
-        #     if name == 'bop':
-        #         dst_actor = None
-        #         for arg in itertools.chain(args, kwargs.values()):
-        #             if isinstance(arg, CupySystemArrRef):
-        #                 dst_actor = arg.cp_arr.data.device_id
-        #                 break
-        #     else:
-        #         gid = get_flatten_id(syskwargs['grid_entry'], syskwargs['grid_shape'])
-        #         dst_actor = gid % self.num_gpus
-
         # print(f"CupyParallelSystem::call compute {args} on {dst_actor}")
 
         args = [self._distribute_to(v.cp_arr, dst_actor)
@@ -223,16 +178,9 @@ class CupyParallelSystem(BaseGPUSystem):
             self.dist_dict = defaultdict(dict)
         else:
             ret = self._register_new_array(ret, dst_actor)
-
-        # tmp = CupySystemArrRef(ret, self)
-        # print(tmp)
-        # return tmp
         return CupySystemArrRef(ret, self)
 
-
     def call_compute_interface(self, name, *args, **kwargs):
-        # if args[0] == "sub":
-        #     print(f"CupyParallelSystem::call args {args} kwargs {kwargs}")
         # Make device placement decisions
         syskwargs = kwargs.pop('syskwargs')
         grid_entry = syskwargs["grid_entry"]
@@ -253,24 +201,8 @@ class CupyParallelSystem(BaseGPUSystem):
                 gid = get_flatten_id(syskwargs['grid_entry'], syskwargs['grid_shape'])
                 dst_actor = gid % self.num_gpus
 
-        # print(f"CupyParallelSystem::call compute {args[0]} on {dst_actor}")
         options = {}
         options["dst_actor"] = dst_actor
-
-        # args = [self._distribute_to(v.cp_arr, dst_actor)
-        #         if isinstance(v, CupySystemArrRef) else v for v in args]
-        # kwargs = {k: self._distribute_to(v.cp_arr, dst_actor)
-        # if isinstance(v, CupySystemArrRef) else v for k, v in kwargs.items()}
-
-        # with self.cp.cuda.Device(dst_actor):
-        #     ret = getattr(self.compute_imp, name)(*args, **kwargs)
-
-        # if self.immediate_gc:
-        #     self.dist_dict = defaultdict(dict)
-        # else:
-        #     ret = self._register_new_array(ret, dst_actor)
-
-        # return CupySystemArrRef(ret, self)
         return self.call_with_options(name, args, kwargs, options)
 
     def distribute_to(self, arr_ref, dst_actor):
@@ -308,7 +240,6 @@ class CupyParallelSystem(BaseGPUSystem):
             return arr
 
     def get_options(self, cluster_entry, cluster_shape):
-        # pass
         node_entry = self.get_cluster_entry(cluster_entry, cluster_shape)
         return {
             "dst_actor": node_entry[0]
@@ -426,11 +357,9 @@ class ArrUID:
 class ActorSystemArrRef:
     def __init__(self, arr_uid, system):
         self.arr_uid = arr_uid
-        # print(f"init ActorSystemArrRef {self.arr_uid}")
         self.system = system
 
     def __del__(self):
-        # print(f"delete ActorSystemArrRef {self.arr_uid}")
         self.system.delete(self.arr_uid)
 
 
@@ -596,11 +525,6 @@ class GPUActorSystem(BaseGPUSystem):
         self.arr_lib = arr_lib
         self.num_gpus = num_gpus
         self.optimizer = True
-        # self.manage_ray = True
-
-        # if ray.is_initialized():
-        #     self.manage_ray = False
-        # if self.manage_ray:
         
         # Launch actors
         if self.arr_lib == "torch":
@@ -631,22 +555,17 @@ class GPUActorSystem(BaseGPUSystem):
             self.copy_task = GPUActorSystem._copy_task_nccl
         else:
             self.copy_task = GPUActorSystem._copy_task_obj_store
-        # print(f"GPUActorSystem::__init__: setup actor")
-        # print(self.gpu_actors) 
-        # print([actor.setup.remote() for actor in self.gpu_actors])
         ray.get([actor.setup.remote() for actor in self.gpu_actors])
         self.actor_ct = 0
 
         # Init ComputeInterface
         super().__init__()
-    
 
     def put(self, data):
         arr_uid = ArrUID()
 
         actor0 = self.gpu_actors[0]
         actor0.put.remote(arr_uid, data)
-        # print(f"put arr_uid {arr_uid} ")
         self._register_new_array(arr_uid, actor0)
 
         for i in range(1, len(self.gpu_actors)):
@@ -665,11 +584,9 @@ class GPUActorSystem(BaseGPUSystem):
             return ray.get([self._get_owner(arr_ref.arr_uid).get.remote(arr_ref.arr_uid)
                             for arr_ref in arr_refs])
 
-
     def touch(self, arr_ref, syskwargs):
         ray.get([self._get_owner(arr_ref.arr_uid).touch.remote()])
         return arr_ref
-
 
     def get_cluster_entry(self, grid_entry, grid_shape):
         ret = [0]
@@ -679,7 +596,6 @@ class GPUActorSystem(BaseGPUSystem):
         ret[0] = ret[0] % len(self.gpu_actors)
         ret.append(0)
         return tuple(ret)
-
 
     def call_with_options(self, name, args, kwargs, options):
         actor_id = options["dst_actor"]
@@ -697,7 +613,6 @@ class GPUActorSystem(BaseGPUSystem):
         self._register_new_array(arr_uid, dst_actor)
         return ActorSystemArrRef(arr_uid, self)
 
-
     def call_compute_interface(self, name, *args, **kwargs):
         # Make device placement decisions
         syskwargs = kwargs.pop('syskwargs')
@@ -707,19 +622,18 @@ class GPUActorSystem(BaseGPUSystem):
         if self.optimizer:
             cluster_entry: tuple = self.get_cluster_entry(grid_entry, grid_shape)
             actor_id = cluster_entry[0]
-            # dst_actor = self.gpu_actors[actor_id]
         else:
             if name == 'bop':
                 dst_actor = None
                 for arg in itertools.chain(args, kwargs.values()):
                     if isinstance(arg, ActorSystemArrRef):
                         dst_actor = self._get_owner(arg.arr_uid)
+                        actor_id = self.gpu_actors.index(dst_actor)
                         break
                 assert dst_actor is not None
             else:
                 gid = get_flatten_id(syskwargs['grid_entry'], syskwargs['grid_shape'])
                 actor_id = gid % len(self.gpu_actors)
-                dst_actor = self.gpu_actors[actor_id]
 
         # print(f"GPUActorSystem::call compute {name} on {self.gpu_actors.index(dst_actor)}")
         # print(f"GPUActorSystem::call args {args} kwargs {kwargs}")
@@ -728,7 +642,6 @@ class GPUActorSystem(BaseGPUSystem):
         options["dst_actor"] = actor_id
 
         return self.call_with_options(name, args, kwargs, options)
-
 
     def _distribute_to(self, arr_uid, dst_actor: ActorHandle):
         ret = self.dist_dict[arr_uid].get(dst_actor, None)
@@ -759,7 +672,6 @@ class GPUActorSystem(BaseGPUSystem):
         return self._distribute_to(arr_ref.arr_uid, dst_actor)
 
     def get_options(self, cluster_entry, cluster_shape):
-        # pass
         node_entry = self.get_cluster_entry(cluster_entry, cluster_shape)
         return {
             "dst_actor": node_entry[0]

@@ -73,10 +73,8 @@ def create(num_gpus, optimizer):
         system: System = RaySystem(compute_module=compute_module,
                                    scheduler=scheduler)
     elif system_name == "cupy-parallel":
-        # cluster_shape = settings.cluster_shape
         system = CupyParallelSystem()
         system.num_gpus = num_gpus
-        # system.cluster_shape = (num_gpus, 1)
         system.optimizer = optimizer
     elif system_name == "cupy-os-actor":
         system = CupyOsActorSystem(num_gpus)
@@ -97,21 +95,14 @@ def destroy():
     # This will shutdown ray if ray was started by NumS.
 
     system = _instance.system
-    # print("del remaining arr ref")
     del _instance.one_half
     del _instance.two
     del _instance.one
     del _instance.zero
-    # print("del instance")
     del _instance
-    _instance = None
-    # print("shutdown system")
     system.shutdown()
-    time.sleep(2)
     # _instance.system.shutdown()
     
-    
-
 
 def configure_logging():
     root = logging.getLogger()

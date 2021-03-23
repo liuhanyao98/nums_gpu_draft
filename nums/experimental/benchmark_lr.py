@@ -42,28 +42,20 @@ def one_step_fit_opt(app, X, y, theta, num_gpus):
     cluster_state = ClusterState((num_gpus, 1), app.system)
     one_ga: GraphArray = GraphArray.from_ba(app.one, cluster_state)
     X_ga = GraphArray.from_ba(X, cluster_state)
-    # print(f"X_ga block_shape {X_ga.block_shape}")
     y_ga = GraphArray.from_ba(y, cluster_state)
     theta_ga = GraphArray.from_ba(theta, cluster_state)
     initend = time.time()
 
     # Section 2
     mu_ga: GraphArray = opt.forward(app, X_ga, theta_ga, one_ga)
-    # print("mu scheduled.")
     grad_ga: GraphArray = opt.grad(app, X_ga, y_ga, mu_ga)
-    # print("grad scheduled.")
     hess_ga: GraphArray = opt.hessian(app, X_ga, one_ga, mu_ga)
-    # print("hess scheduled.")
     endtime = time.time()
 
     grad_ga_ba: BlockArray = opt.compute_graph_array(app, grad_ga)
     hess_ga_ba: BlockArray = opt.compute_graph_array(app, hess_ga)
-    # print("update theta")
     theta: BlockArray = opt.update_theta(app, grad_ga_ba, hess_ga_ba, theta)
-    # mu = forward(X, theta, one)
-    # grad_ = grad(X, y, mu)
-    # hess_ = hessian(X, one, mu)
-    # theta = update_theta(grad_, hess_, theta)
+
     theta.touch()
 
     return initend, endtime
@@ -159,13 +151,11 @@ def benchmark_lr(num_gpus, N_list, system_class_list, d=1000, optimizer=True, dt
                     # Benchmark one step LR
                     def func():
                         tic = time.time()
-
                         if optimizer:
                             toc_init, toc_opt = one_step_fit_opt(app, X, y, theta, num_gpus=num_gpus)
                         else:
                             toc_init = tic
                             toc_opt = one_step_fit(app, X, y, theta)
-
                         toc = time.time()
                         return toc - tic, toc_opt - tic, toc_init - tic, None
 

@@ -119,15 +119,11 @@ def benchmark_bop(num_gpus, N_list, system_class_list, d=400000, optimizer=True,
                     app = am.instance(num_gpus, optimizer)
 
                     W = app.ones(shape=(d1, d2), block_shape=(d1, d2 // num_gpus), dtype=dtype)
-                    # print("W", W)
-                    # print(W.shape)
                     D = app.ones(shape=(d2, N), block_shape=(d2 // num_gpus, N), dtype=dtype)
-                    # print("D", D)
-                    # print(D.shape)
                     # X = app.ones((N, d), block_shape=(N // num_gpus, d), dtype=dtype)
+
                     # Benchmark bop
                     def func():
-                        # print("start func")
                         tic = time.time()
                         if optimizer:
                             toc_init, toc_opt = matmul_opt(app, W, D, num_gpus)
@@ -135,16 +131,13 @@ def benchmark_bop(num_gpus, N_list, system_class_list, d=400000, optimizer=True,
                         else:
                             Z = (W @ D).touch()
                             # Z = (X.T @ X).touch()
-                        # print("end func")
                         toc = time.time()
                         return toc - tic, 0, 0, None
 
                     costs, costs_opt, costs_init = benchmark_func(func)
-                    
-                    # print("del W D")
+
                     del (W, D)
                     am.destroy()
-                    # print("delete w d app")
             #except Exception:
             else:
                 costs = [-1]
