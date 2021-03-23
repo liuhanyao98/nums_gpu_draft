@@ -107,7 +107,7 @@ def distribute_graph_array(G, cluster_state):
 
 
 def one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False):
-    # --forward proprogation--
+    # --forward propagation--
     LR = app.one
     cluster_state = ClusterState((num_gpus, 1), app.system)
     one_ga: GraphArray = GraphArray.from_ba(app.one, cluster_state)
@@ -145,13 +145,13 @@ def one_step_fit_opt(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, verbose=False)
     # --back propagation--
     if verbose:
         print("collapse D_out_ga")
-    D_out_ga = opt.collapse_graph_array(app, F_out_ga.T * (y_predict_ga - y_ga).T)  # --> 0/1
+    D_out_ga = opt.collapse_graph_array(app, F_out_ga.T * (y_predict_ga - y_ga).T)
     if verbose:
         print("collapse D_2_ga")
     D_2_ga = opt.collapse_graph_array(app, F_2_ga.T * (W_2_out_ga @ D_out_ga))
     if verbose:
         print("collapse D_1_ga")
-    D_1_ga = opt.collapse_graph_array(app, F_1_ga.T * (W_1_2_ga @ D_2_ga))  # --> 0/1
+    D_1_ga = opt.collapse_graph_array(app, F_1_ga.T * (W_1_2_ga @ D_2_ga))
     distribute_graph_array(D_1_ga, cluster_state)
     if verbose:
         print("collapse_graph_array dW_in_1_ga")
@@ -258,9 +258,6 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=140000, optimizer=True,
                         toc = time.time()
                         return toc - tic, toc_end - tic, 0, None
 
-                    # func()
-                    # exit()
-
                     costs, costs_opt, costs_init = benchmark_func(func)
                     del (X, y, W_in_1, W_1_2, W_2_out)
                 else:
@@ -295,7 +292,6 @@ def benchmark_mlp(num_gpus, N_list, system_class_list, d=140000, optimizer=True,
                 costs_init = [-1]
 
             log_str = format_string % (
-                # system_class.__name__,
                 name,
                 "%d" % N,
                 "%d" % d,
