@@ -127,6 +127,7 @@ class CupyParallelSystem(BaseGPUSystem):
         self.local_cache = local_cache
         self.immediate_gc = immediate_gc
         self.optimizer = True
+        self.cluster_shape = (self.num_gpus, 1)
 
         self.compute_imp = cupy_compute.ComputeCls()
         self.dist_dict = defaultdict(dict)   # Dict[hash(array) -> Dict[actor_id -> array]]

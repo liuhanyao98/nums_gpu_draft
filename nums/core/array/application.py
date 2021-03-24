@@ -329,7 +329,6 @@ class ArrayApplication(object):
                                                                      "grid_entry": grid_entry,
                                                                      "grid_shape": grid.grid_shape
                                                                  })
-            # print(rarr.blocks[grid_entry].oid)
         return rarr
 
     def concatenate(self, arrays: List, axis: int, axis_block_size: int = None):

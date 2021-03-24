@@ -75,6 +75,7 @@ def create(num_gpus, optimizer):
     elif system_name == "cupy-parallel":
         system = CupyParallelSystem()
         system.num_gpus = num_gpus
+        system.cluster_shape = (num_gpus, 1)
         system.optimizer = optimizer
     elif system_name == "cupy-os-actor":
         system = CupyOsActorSystem(num_gpus)
