@@ -176,7 +176,6 @@ class NumsRandomState(object):
                                                       "grid_entry": grid_entry,
                                                       "grid_shape": grid.grid_shape
                                                   })
-            # print(block.oid)
         return ba
 
     def permutation(self, size, block_size):
