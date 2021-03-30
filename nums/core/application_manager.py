@@ -73,8 +73,8 @@ def create():
         system: System = RaySystem(compute_module=compute_module,
                                    scheduler=scheduler)
     elif system_name == "cupy-parallel":
-        # use cupy_compute as compute module internally
         system = CupyParallelSystem()
+        system.optimizer = settings.optimizer
         system.num_gpus = settings.num_gpus
         system.cluster_shape = (settings.num_gpus, 1)
     else:

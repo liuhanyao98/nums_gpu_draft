@@ -30,9 +30,10 @@ Path(data_dir).mkdir(parents=True, exist_ok=True)
 # System settings.
 # system_name = os.environ.get("NUMS_SYSTEM", "ray-cyclic")
 
-# Parallel system only uses the following two values
+# Parallel system only uses the following three values
 system_name = os.environ.get("NUMS_SYSTEM", "cupy-parallel")
 num_gpus = 1
+optimizer = True
 
 # TODO (hme):
 #  - Make cluster shape an environment variable. Default depends on available resources.
