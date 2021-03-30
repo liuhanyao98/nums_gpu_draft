@@ -41,6 +41,14 @@ def sigmoid_deriv(one, Z):
     return Z * (one - Z)
 
 
+def sigmoid_opt(app, X, one):
+    return opt.collapse_graph_array(app, one / (one + app.exp(-X)))
+
+
+def sigmoid_deriv_opt(app, Z, one):
+    return opt.collapse_graph_array(app, Z * (one - Z))
+
+
 def one_step_fit_common(app, one, X, y, W_in_1, W_1_2, W_2_out):
     LR = one
     Z_1 = X @ W_in_1
@@ -111,19 +119,19 @@ def one_step_fit_opt_data_parallel(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus, 
     distribute_weights(app, W_2_out, cluster_state)
 
     Z_1_ga: GraphArray = forward(app, X_ga, W_in_1_ga)
-    S_1_ga: GraphArray = opt.sigmoid(app, Z_1_ga, one_ga)
-    F_1_ga: GraphArray = opt.sigmoid_deriv(app, Z_1_ga, one_ga)
+    S_1_ga: GraphArray = sigmoid_opt(app, Z_1_ga, one_ga)
+    F_1_ga: GraphArray = sigmoid_deriv_opt(app, Z_1_ga, one_ga)
 
     if verbose:
         print("forward Z_2")
     Z_2_ga: GraphArray = forward(app, S_1_ga, W_1_2_ga)
-    S_2_ga: GraphArray = opt.sigmoid(app, Z_2_ga, one_ga)
-    F_2_ga: GraphArray = opt.sigmoid_deriv(app, Z_2_ga, one_ga)
+    S_2_ga: GraphArray = sigmoid_opt(app, Z_2_ga, one_ga)
+    F_2_ga: GraphArray = sigmoid_deriv_opt(app, Z_2_ga, one_ga)
     if verbose:
         print("forward Z_out")
     Z_out_ga: GraphArray = forward(app, S_2_ga, W_2_out_ga)
-    y_predict_ga: GraphArray = opt.sigmoid(app, Z_out_ga, one_ga)
-    F_out_ga: GraphArray = opt.sigmoid_deriv(app, Z_out_ga, one_ga)
+    y_predict_ga: GraphArray = sigmoid_opt(app, Z_out_ga, one_ga)
+    F_out_ga: GraphArray = sigmoid_deriv_opt(app, Z_out_ga, one_ga)
 
     # --back propagation--
     D_out_ga = opt.collapse_graph_array(app, F_out_ga.T * (y_predict_ga - y_ga).T)
@@ -283,10 +291,10 @@ if __name__ == "__main__":
             # 2000,
             # 4000,
             # 8000,
-            16000,
-            32000,
-            40000,
-            42000,
+            # 16000,
+            # 32000,
+            # 40000,
+            # 42000,
             44000,
             # 0.5e6 / 4,
             # 1e6 / 4,

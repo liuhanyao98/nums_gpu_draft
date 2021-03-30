@@ -18,7 +18,7 @@ from nums.core import application_manager as am
 from nums.core import settings
 from utils import benchmark_func, get_number_of_gpus
 import lr_opt as opt
-from benchmark_mlp_data import forward, one_step_fit_np, one_step_fit, np_sample
+from benchmark_mlp_data import forward, sigmoid_opt, sigmoid_deriv_opt, one_step_fit_np, one_step_fit, np_sample
 
 random_seed = 1337
 
@@ -50,24 +50,24 @@ def one_step_fit_opt_model_parallel(app, X, y, W_in_1, W_1_2, W_2_out, num_gpus,
     Z_1_ga: GraphArray = forward(app, X_ga, W_in_1_ga)
     if verbose:
         print("forward S_1_ga")
-    S_1_ga: GraphArray = opt.sigmoid(app, Z_1_ga, one_ga)
+    S_1_ga: GraphArray = sigmoid_opt(app, Z_1_ga, one_ga)
     if verbose:
         print("forward F_1_ga")
-    F_1_ga: GraphArray = opt.sigmoid_deriv(app, Z_1_ga, one_ga)
+    F_1_ga: GraphArray = sigmoid_deriv_opt(app, Z_1_ga, one_ga)
     if verbose:
         print("forward Z_2_ga")
     Z_2_ga: GraphArray = forward(app, S_1_ga, W_1_2_ga)
-    S_2_ga: GraphArray = opt.sigmoid(app, Z_2_ga, one_ga)
-    F_2_ga: GraphArray = opt.sigmoid_deriv(app, Z_2_ga, one_ga)
+    S_2_ga: GraphArray = sigmoid_opt(app, Z_2_ga, one_ga)
+    F_2_ga: GraphArray = sigmoid_deriv_opt(app, Z_2_ga, one_ga)
     if verbose:
         print("forward Z_out_ga")
     Z_out_ga: GraphArray = forward(app, S_2_ga, W_2_out_ga)
     if verbose:
         print("forward y_predict_ga")
-    y_predict_ga: GraphArray = opt.sigmoid(app, Z_out_ga, one_ga)
+    y_predict_ga: GraphArray = sigmoid_opt(app, Z_out_ga, one_ga)
     if verbose:
         print("forward F_out_ga")
-    F_out_ga: GraphArray = opt.sigmoid_deriv(app, Z_out_ga, one_ga)
+    F_out_ga: GraphArray = sigmoid_deriv_opt(app, Z_out_ga, one_ga)
 
     # --back propagation--
     if verbose:
@@ -225,14 +225,14 @@ if __name__ == "__main__":
     benchmark_mlp_model_parallel(
         num_gpus,
         N_list=[
-            # 2000,
-            4096,
-            8192,
-            16384,
-            32768,
-            70000,
-            140000,
-            160000,
+            2000,
+            # 4096,
+            # 8192,
+            # 16384,
+            # 32768,
+            # 70000,
+            # 140000,
+            # 160000,
             # 3000,
             # 0.5e6 / 4,
             # 1e6 / 4,

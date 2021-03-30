@@ -9,7 +9,7 @@ def check_block_integrity(arr):
         assert arr.blocks[grid_entry].shape == arr.grid.get_block_shape(grid_entry)
 
 
-def benchmark_func(func, repeat=3, warmup=1):
+def benchmark_func(func, repeat=2, warmup=1):
     for i in range(warmup):
         gc.collect()
         func()

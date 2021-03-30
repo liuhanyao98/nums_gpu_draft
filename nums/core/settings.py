@@ -32,7 +32,7 @@ Path(data_dir).mkdir(parents=True, exist_ok=True)
 
 # Parallel system only uses the following three values
 system_name = os.environ.get("NUMS_SYSTEM", "cupy-parallel")
-num_gpus = 1
+num_gpus = 4
 optimizer = True
 
 # TODO (hme):
