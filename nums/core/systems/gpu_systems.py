@@ -127,7 +127,7 @@ class CupyParallelSystem(BaseGPUSystem):
         self.local_cache = local_cache
         self.immediate_gc = immediate_gc
         self.cluster_shape = (self.num_gpus, 1)
-
+        self.optimizer = True
         self.compute_imp = cupy_compute.ComputeCls()
         self.dist_dict = defaultdict(dict)   # Dict[hash(array) -> Dict[actor_id -> array]]
         super().__init__()
@@ -186,15 +186,20 @@ class CupyParallelSystem(BaseGPUSystem):
         grid_entry = syskwargs["grid_entry"]
         grid_shape = syskwargs["grid_shape"]
 
-        if name == 'bop':
-            dst_actor = None
-            for arg in itertools.chain(args, kwargs.values()):
-                if isinstance(arg, CupySystemArrRef):
-                    dst_actor = arg.cp_arr.data.device_id
-                    break
+        if self.optimizer:
+            cluster_entry: tuple = self.get_cluster_entry(grid_entry, grid_shape)
+            # print(f"CupyParallelSystem::call grid entry {grid_entry} and cluster entry {cluster_entry}")
+            dst_actor = cluster_entry[0]
         else:
-            gid = get_flatten_id(grid_entry, grid_shape)
-            dst_actor = gid % self.num_gpus
+            if name == 'bop':
+                dst_actor = None
+                for arg in itertools.chain(args, kwargs.values()):
+                    if isinstance(arg, CupySystemArrRef):
+                        dst_actor = arg.cp_arr.data.device_id
+                        break
+            else:
+                gid = get_flatten_id(grid_entry, grid_shape)
+                dst_actor = gid % self.num_gpus
 
         options = {}
         options["dst_actor"] = dst_actor
@@ -249,7 +254,6 @@ class CupyParallelSystem(BaseGPUSystem):
         self.dist_dict = None
         mempool = self.cp.get_default_memory_pool()
         mempool.free_all_blocks()
-
 
 
 def get_flatten_id(grid_entry, grid_shape):
